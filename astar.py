@@ -9,6 +9,12 @@ def find_nth(haystack, needle, n):
         n -= 1
     return start
 
+def tranferse_state(state):
+    for i in range(len(state)):
+        if (state[i]==3 or state[i]==4 or state[i]==5):
+            state[i]=2
+
+
 def check_wide(state,dir,h,loc):
     ret=True 
     if (loc%4+dir == -1 or loc%4+dir == 4):
@@ -50,6 +56,7 @@ class State():
         self.CurrentState =  CurrentState
         self.pathset = {}
         self.pastPath =[]
+        self.numExpand = 0
 
     # check if it is the goal
     def is_goal(self):
@@ -98,12 +105,16 @@ class State():
         statelist== queue.PriorityQueue()
         for t in tileset:
             if (check_wide(self.CurrentState,1,t.height,t.location)): # left
+                self.numExpand += 1
                 newstate = move_wide(self.CurrentState,1,t.width,t.height,t.location, t.type)
             if (check_wide(self.CurrentState,-1,t.height,t.location)): # right
+                self.numExpand += 1
                 newstate = move_wide(self.CurrentState,-1,t.width,t.height,t.location, t.type)
             if (check_height(self.CurrentState,-1,t.width,t.location)): # up
+                self.numExpand += 1
                 newstate=move_height(self.CurrentState,-1,t.width,t.height,t.location, t.type)
             if (check_height(self.CurrentState,1,t.width,t.location)): # down  
+                self.numExpand += 1
                 newstate=move_height(self.CurrentState,1,t.width,t.height,t.location, t.type)        
 
 
