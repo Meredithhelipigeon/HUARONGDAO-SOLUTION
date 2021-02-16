@@ -9,6 +9,33 @@ def find_nth(haystack, needle, n):
         n -= 1
     return start
 
+def check_wide(state,dir,h,loc):
+    ret=True 
+    if (loc%4+dir == -1 or loc%4+dir == 4):
+        ret=False
+    for n in range(1,h):
+        if (state[loc+dir+(h-1)*4] != 0):
+            ret=False
+    return ret
+
+def move_wide(state,dir,w,h,loc,tpe):
+    for i in range(1,h):
+        state[loc+dir+(h-1)*4], state[loc+w-1] = state[loc+w-1], state[loc+dir+(h-1)*4]
+
+def check_height(state,dir,w,loc):
+    ret=True
+    if (loc/4+dir==-1 or loc/4+dir==5 ):
+        ret=False 
+    for n in range(1,w):
+        if (state[loc+dir*4+w-1] != 0):
+            ret=False
+    return ret    
+
+ def move_height(state,dir,w,h,loc,tpe):
+    for i in range(1,w):
+        state[loc+dir*4+w-1]=tpe
+        state[loc+h-1]='0'     
+
 class Tile:
     # class attribute
     def __init__(self, location, height, width, type):
@@ -63,12 +90,21 @@ class State():
                     tileset.add(Tile(find_nth(self.CurrentState, "7",j),1,1,'7'))
             else:
                 tile.set.add(Tile(self.CurrentState.find(char(i)),2,1,char(i)))
-        return tileset
-
+        return tileset          
+           
     # return the new state
     def successor(self):
         tileset=self.get_tileset
         statelist== queue.PriorityQueue()
+        for t in tileset:
+            if (check_wide(self.CurrentState,1,t.height,t.location)): # left
+                newstate = move_wide(self.CurrentState,1,t.width,t.height,t.location, t.type)
+            if (check_wide(self.CurrentState,-1,t.height,t.location)): # right
+                newstate = move_wide(self.CurrentState,-1,t.width,t.height,t.location, t.type)
+            if (check_height(self.CurrentState,-1,t.width,t.location)): # up
+                newstate=move_height(self.CurrentState,-1,t.width,t.height,t.location, t.type)
+            if (check_height(self.CurrentState,1,t.width,t.location)): # down  
+                newstate=move_height(self.CurrentState,1,t.width,t.height,t.location, t.type)        
 
 
 
