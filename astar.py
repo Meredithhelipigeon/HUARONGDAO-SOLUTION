@@ -2,6 +2,9 @@ import numpy
 import threading, queue
 import heapq
 
+frontier = queue.PriorityQueue()
+pathset = set()
+
 def find_nth(haystack, needle, n):
     start = haystack.find(needle)
     while start >= 0 and n > 1:
@@ -10,53 +13,77 @@ def find_nth(haystack, needle, n):
     return start
 
 def tranferse_state(state):
-    for i in range(len(state)):
-        if (state[i]==3 or state[i]==4 or state[i]==5):
-            state[i]=2
+    state=state.replace("3","2")
+    state=state.replace("4","2")
+    state=state.replace("5","2")
+    return state
 
+def print_state(state):
+    for i in range(5):
+        print(state[4*i:4*i+4])
 
-def check_wide(state,dir,h,loc):
-    ret=True 
-    if (loc%4+dir == -1 or loc%4+dir == 4):
-        ret=False
-    for n in range(1,h):
-        if (state[loc+dir+(h-1)*4] != 0):
-            ret=False
-    return ret
+def check_wide(state,dir,w,h,loc):
+    if ((dir==1 and loc%4+w == 4) or (dir==-1 and loc%4+dir == -1)):
+        return False
+    for n in range(h):
+        if (dir==1 and state[loc+w+n*4] != '0'):
+            return False
+        if (dir==-1 and state[loc+dir+n*4] != '0'):
+            return False
+    return True
 
-def move_wide(state,dir,w,h,loc,tpe):
-    for i in range(1,h):
-        state[loc+dir+(h-1)*4], state[loc+w-1] = state[loc+w-1], state[loc+dir+(h-1)*4]
-
-def check_height(state,dir,w,loc):
-    ret=True
-    if (loc/4+dir==-1 or loc/4+dir==5 ):
-        ret=False 
-    for n in range(1,w):
-        if (state[loc+dir*4+w-1] != 0):
-            ret=False
+def list_to_str(l):
+    ret = ""
+    for e in l:
+        ret += e
     return ret    
 
- def move_height(state,dir,w,h,loc,tpe):
-    for i in range(1,w):
-        state[loc+dir*4+w-1]=tpe
-        state[loc+h-1]='0'     
+
+def move_wide(state,dir,w,h,loc,tpe):
+    st=list(state)
+    for i in range(h):
+        if (dir == -1): #left
+            st[loc+dir+i*4], st[loc+w-1+i*4] = st[loc+w-1+i*4], st[loc+dir+i*4]
+        else:
+            st[loc+w+i*4], st[loc+i*4] = st[loc+i*4], st[loc+w+i*4]
+    return list_to_str(st)     
+
+def check_height(state,dir,w,h,loc):
+    if ((dir==1 and loc//4+h==5) or (dir==-1 and loc//4-1==-1)):
+        return False 
+    for n in range(w):
+        if (dir==1 and state[loc+n+h*4] != '0'):
+            return False
+        if (dir==-1 and state[loc+dir*4+n] != '0'):
+            return False    
+    return True    
+
+def move_height(state,dir,w,h,loc,tpe):
+    st=list(state)
+    for i in range(w):
+        if (dir == -1): #up
+            st[loc+dir*4+i], st[loc+(h-1)*4+i] =  st[loc+(h-1)*4+i], st[loc+dir*4+i]
+        else:
+            st[loc+h*4+i], st[loc+i] =  st[loc+i], st[loc+h*4+i]            
+    return list_to_str(st)    
+
 
 class Tile:
     # class attribute
-    def __init__(self, location, height, width, type):
+    def __init__(self, location, height, width, tpe):
         self.location=location
         self.height=height
         self.width=width  
-        self.type=type      
+        self.tpe=tpe      
 
 class State():
     # class attribute
     def __init__(self, CurrentState):
         self.CurrentState =  CurrentState
-        self.pathset = {}
-        self.pastPath =[]
+        pathset.add(tranferse_state(CurrentState))
+        self.pastPath = queue.Queue()
         self.numExpand = 0
+        frontier.put(self)
 
     # check if it is the goal
     def is_goal(self):
@@ -68,12 +95,12 @@ class State():
     # calculate the return value of heuristic function
     def get_heuristic(self):
         diff_x = abs(self.CurrentState.find('1')%4 - 1)   
-        diff_y = abs(self.CurrentState.find('1')/4 - 3)  
+        diff_y = abs(self.CurrentState.find('1')//4 - 3)  
         return  diff_x+diff_y    
     
     # calculate the cost of the current set
     def get_cost(self):
-        return len(self.pastPath)
+        return self.pastPath.qsize()
 
     # define the operator of "gt"
     def __gt__(self, other):
@@ -86,7 +113,7 @@ class State():
 
     # return the tile set 
     def get_tileset(self):
-        tileset = {}
+        tileset = set()
         for i in range(1,8):
             if(i==1):
                 tileset.add(Tile(self.CurrentState.find('1'),2,2,'1'))
@@ -96,35 +123,69 @@ class State():
                 for j in range(1,5):   # iterate from 1 to 4   
                     tileset.add(Tile(find_nth(self.CurrentState, "7",j),1,1,'7'))
             else:
-                tile.set.add(Tile(self.CurrentState.find(char(i)),2,1,char(i)))
+                tileset.add(Tile(self.CurrentState.find(str(i)),2,1,chr(i)))
         return tileset          
            
     # return the new state
     def successor(self):
-        tileset=self.get_tileset
-        statelist== queue.PriorityQueue()
+        tileset=self.get_tileset()
         for t in tileset:
-            if (check_wide(self.CurrentState,1,t.height,t.location)): # left
+            if (check_wide(self.CurrentState,-1,t.width,t.height,t.location)): # left
                 self.numExpand += 1
-                newstate = move_wide(self.CurrentState,1,t.width,t.height,t.location, t.type)
-            if (check_wide(self.CurrentState,-1,t.height,t.location)): # right
+                newstate = move_wide(self.CurrentState,-1,t.width,t.height,t.location, t.tpe)
+                if(not(tranferse_state(newstate) in pathset)):
+                    new_State=State(newstate)
+                    frontier.put(new_State)
+                    pathset.add(tranferse_state(newstate))  
+            if (check_wide(self.CurrentState,1,t.width,t.height,t.location)): # right
                 self.numExpand += 1
-                newstate = move_wide(self.CurrentState,-1,t.width,t.height,t.location, t.type)
-            if (check_height(self.CurrentState,-1,t.width,t.location)): # up
+                newstate = move_wide(self.CurrentState,1,t.width,t.height,t.location, t.tpe)
+                if(not(tranferse_state(newstate) in pathset)):
+                    new_State=State(newstate)
+                    frontier.put(new_State)
+                    pathset.add(tranferse_state(newstate)) 
+            if (check_height(self.CurrentState,-1,t.width,t.height,t.location)): # up
                 self.numExpand += 1
-                newstate=move_height(self.CurrentState,-1,t.width,t.height,t.location, t.type)
-            if (check_height(self.CurrentState,1,t.width,t.location)): # down  
+                newstate=move_height(self.CurrentState,-1,t.width,t.height,t.location, t.tpe)
+                if(not(tranferse_state(newstate) in pathset)):
+                    new_State=State(newstate)
+                    frontier.put(new_State)
+                    pathset.add(tranferse_state(newstate)) 
+            if (check_height(self.CurrentState,1,t.width,t.height,t.location)): # down  
                 self.numExpand += 1
-                newstate=move_height(self.CurrentState,1,t.width,t.height,t.location, t.type)        
+                newstate=move_height(self.CurrentState,1,t.width,t.height,t.location, t.tpe)
+                if(not(tranferse_state(newstate) in pathset)):
+                    new_State=State(newstate)
+                    frontier.put(new_State)
+                    pathset.add(tranferse_state(newstate)) 
+        if(not frontier.empty()):
+            realstate=frontier.get()
+            self.pastPath.put(self.CurrentState)  
+            self.CurrentState=realstate.CurrentState     
 
+    def get_star(self):
+        while(not self.is_goal()):
+            #if self.numExpand > 1000000:
+            #    break
+            self.successor()
 
-
-
-class :
-    
 
 def main():
-    print(2)
-
-
+    # 06602113211347754775
+    # 21132113466547757007
+    # 21132113466547757007
+    initialstate=State("21132113466547757007")
+    print("Initial state:")
+    print_state(initialstate.CurrentState)
+    initialstate.get_star()
+    print("Cost of the solution: "+str(initialstate.pastPath.qsize())+"\n")
+    print("Number of states expanded: "+str(initialstate.numExpand)+"\n")
+    print("Solution:\n")
+    num=initialstate.pastPath.qsize()
+    for i in range(0, num):
+        print(i)
+        print_state(initialstate.pastPath.get()+"\n")
+    print(num)
+    print_state(initialstate.CurrentState)
 main()
+
