@@ -1,9 +1,12 @@
 import numpy
-import threading, queue
+import queue
 import heapq
-
+import copy
+#from copy import copy, deepcopy
+# from multiprocessing import queue
 frontier = queue.PriorityQueue()
 pathset = set()
+numExpand = 0
 
 def find_nth(haystack, needle, n):
     start = haystack.find(needle)
@@ -67,6 +70,24 @@ def move_height(state,dir,w,h,loc,tpe):
             st[loc+h*4+i], st[loc+i] =  st[loc+i], st[loc+h*4+i]            
     return list_to_str(st)    
 
+class Path():
+    # class attribute
+    def __init__(self, p):
+        self.p = p
+
+    def get_cost(self):
+        return len(self.p)
+
+
+    # define the operator of "gt"
+    def __gt__(self, other):
+        valself = self.p[-1].get_heuristic()+ self.get_cost()
+        valoth = other.p[-1].get_heuristic() + other.get_cost() 
+        if (valoth>valself):
+            return False
+        else:
+            return True      
+
 
 class Tile:
     # class attribute
@@ -82,8 +103,6 @@ class State():
         self.CurrentState =  CurrentState
         pathset.add(tranferse_state(CurrentState))
         self.pastPath = queue.Queue()
-        self.numExpand = 0
-        frontier.put(self)
 
     # check if it is the goal
     def is_goal(self):
@@ -96,21 +115,16 @@ class State():
     def get_heuristic(self):
         diff_x = abs(self.CurrentState.find('1')%4 - 1)   
         diff_y = abs(self.CurrentState.find('1')//4 - 3)  
-        return  diff_x+diff_y    
-    
-    # calculate the cost of the current set
-    def get_cost(self):
-        return self.pastPath.qsize()
+        return  diff_x+diff_y       
 
-    # define the operator of "gt"
-    def __gt__(self, other):
-        valself = self.get_heuristic() +  self.get_cost() 
-        valoth = other.get_heuristic() +  other.get_cost() 
-        if (valoth>valself):
-            return False
-        else:
-            return True    
-
+    def __deepcopy__(self,memo):
+        id_self = id(self)        # memoization avoids unnecesary recursion
+        _copy = memo.get(id_self)
+        if _copy is None:
+            _copy = type(self)(
+                copy.deepcopy(self.CurrentState, memo))
+            memo[id_self] = _copy 
+        return _copy
     # return the tile set 
     def get_tileset(self):
         tileset = set()
@@ -126,48 +140,69 @@ class State():
                 tileset.add(Tile(self.CurrentState.find(str(i)),2,1,chr(i)))
         return tileset          
            
-    # return the new state
-    def successor(self):
+    # add all of the paths
+    def successor(self,p):
+        global numExpand
         tileset=self.get_tileset()
+        ret=[]
         for t in tileset:
             if (check_wide(self.CurrentState,-1,t.width,t.height,t.location)): # left
-                self.numExpand += 1
+                numExpand += 1
                 newstate = move_wide(self.CurrentState,-1,t.width,t.height,t.location, t.tpe)
                 if(not(tranferse_state(newstate) in pathset)):
                     new_State=State(newstate)
-                    frontier.put(new_State)
-                    pathset.add(tranferse_state(newstate))  
+                    np = copy.deepcopy(p)
+                    np.append(new_State)
+                    frontier.put(Path(np))
+                    pathset.add(tranferse_state(newstate))
+                    if(new_State.is_goal()):
+                        ret=np  
             if (check_wide(self.CurrentState,1,t.width,t.height,t.location)): # right
-                self.numExpand += 1
+                numExpand += 1
                 newstate = move_wide(self.CurrentState,1,t.width,t.height,t.location, t.tpe)
                 if(not(tranferse_state(newstate) in pathset)):
                     new_State=State(newstate)
-                    frontier.put(new_State)
+                    np = copy.deepcopy(p)
+                    np.append(new_State)
+                    frontier.put(Path(np))
                     pathset.add(tranferse_state(newstate)) 
+                    if(new_State.is_goal()):
+                        ret=np 
             if (check_height(self.CurrentState,-1,t.width,t.height,t.location)): # up
-                self.numExpand += 1
+                numExpand += 1
                 newstate=move_height(self.CurrentState,-1,t.width,t.height,t.location, t.tpe)
                 if(not(tranferse_state(newstate) in pathset)):
                     new_State=State(newstate)
-                    frontier.put(new_State)
+                    np = copy.deepcopy(p)
+                    np.append(new_State)
+                    frontier.put(Path(np))
                     pathset.add(tranferse_state(newstate)) 
+                    if(new_State.is_goal()):
+                        ret=np 
             if (check_height(self.CurrentState,1,t.width,t.height,t.location)): # down  
-                self.numExpand += 1
+                numExpand += 1
                 newstate=move_height(self.CurrentState,1,t.width,t.height,t.location, t.tpe)
                 if(not(tranferse_state(newstate) in pathset)):
                     new_State=State(newstate)
-                    frontier.put(new_State)
+                    np = copy.deepcopy(p)
+                    np.append(new_State)
+                    frontier.put(Path(np))
                     pathset.add(tranferse_state(newstate)) 
-        if(not frontier.empty()):
-            realstate=frontier.get()
-            self.pastPath.put(self.CurrentState)  
-            self.CurrentState=realstate.CurrentState     
+                    if(new_State.is_goal()):
+                        ret=np 
+        return ret
+    
 
     def get_star(self):
-        while(not self.is_goal()):
-            #if self.numExpand > 1000000:
-            #    break
-            self.successor()
+        ret=[]
+        i = 0
+        while (not frontier.empty()):
+            np = frontier.get().p
+            ret=np[-1].successor(np)
+            if ret:
+                break
+            i += 1
+        return ret
 
 
 def main():
@@ -175,17 +210,25 @@ def main():
     # 21132113466547757007
     # 21132113466547757007
     initialstate=State("21132113466547757007")
+    l = []
+    l.append(initialstate)
+    initialpath = Path(l)
+    frontier.put(initialpath)
     print("Initial state:")
     print_state(initialstate.CurrentState)
-    initialstate.get_star()
-    print("Cost of the solution: "+str(initialstate.pastPath.qsize())+"\n")
-    print("Number of states expanded: "+str(initialstate.numExpand)+"\n")
+    ret=initialstate.get_star()
+    print("Cost of the solution: "+str(len(ret))+"\n")
+    print("Number of states expanded: "+str(numExpand)+"\n")
+    print("Number of frontier "+str(frontier.qsize()))
     print("Solution:\n")
-    num=initialstate.pastPath.qsize()
+    num=len(ret)
     for i in range(0, num):
         print(i)
-        print_state(initialstate.pastPath.get()+"\n")
-    print(num)
-    print_state(initialstate.CurrentState)
+        print_state(ret[i].CurrentState)
+
+
+import time
+start_time = time.time()
 main()
+print("--- %s seconds ---" % (time.time() - start_time))
 
